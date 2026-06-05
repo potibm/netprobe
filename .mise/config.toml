@@ -1,0 +1,65 @@
+[tools]
+go = "1.26"
+golangci-lint = "2.12.2"
+dotenv-linter = "4.0.0"
+"go:github.com/icholy/gomajor" = "0.15.0"
+"go:github.com/google/go-licenses/v2" = "2.0.1"
+actionlint = "1.7.12"
+
+[tasks.build]
+description = "Build the Go application"
+run = "mkdir -p artifacts/build && go build -ldflags '-X main.version=$(NOW)' -o artifacts/build/netprobe ./src/cmd "
+
+[tasks.run]
+description = "Run the Go application"
+run = "go run -ldflags '-X main.version=$(NOW)' .  --log-level debug --interface en0 --config config/example.yaml --ip-family 6"
+
+[tasks.lint]
+description = "Lint the Go code"
+usage = """
+flag "--fix" help="Automatically fix linting issues"
+"""
+run = """
+    : "🚦 Orchestration (Auto-Fix: ${usage_fix:-false})"
+    if [ "$usage_fix" = "true" ]; then
+        mise run be:lint --fix ::: repo:lint --fix
+    else
+        mise run be:lint ::: repo:lint
+    fi
+"""
+
+[tasks.test]
+description = "Run tests for the Go application"
+run = """
+    mkdir -p artifacts/coverage
+    go test -cover -coverprofile=artifacts/coverage/coverage.out -coverpkg=./... -v ./src/...
+	go tool cover -html=artifacts/coverage/coverage.out -o artifacts/coverage/coverage.html
+"""
+
+[tasks."deps:install"]
+description = "Install dependencies"
+run = """
+	go mod download
+"""
+
+[tasks."deps:update"]
+description = "Update all dependencies"
+run = """
+    mise up --bump --interactive
+    mise run be:deps:update ::: actions:deps:update
+"""
+
+[tasks."be:deps:update"]
+description = "Update Go module dependencies"
+run = """
+    go get -u -t ./...
+	go mod tidy
+    gomajor list
+"""
+
+[tasks."actions:deps:update"]
+description = "Update GitHub Actions versions"
+run = """
+  : "🐙 Update GitHub Actions"
+  npx actions-up
+"""

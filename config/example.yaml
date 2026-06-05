@@ -1,0 +1,33 @@
+name: "example configuration"
+
+defaults:
+  interval: "30s"
+  timeout: "3s"
+  retries: 2
+  slack_channel: "#netprobe"
+
+probes:
+  - id: "portal"
+    hostname: "www.evoke.eu"
+
+    http:
+      expect_up: true
+      expect_redirect_to_https: true
+
+    https:
+      um expect_up: true
+      expect_valid_cert: true
+
+    websocket:
+      expect_up: true
+
+  - id: "legacy-internal"
+    hostname: "legacy.evoke.local"
+
+    http:
+      url: "http://legacy.evoke.local/"
+      expect_up: false
+      expect_redirect_to_https: false
+
+    https:
+      expect_up: false

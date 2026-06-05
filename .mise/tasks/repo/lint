@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#MISE description="Lint and format repository files (Markdown, YAML, JSON)"
+#USAGE flag "--fix" help="Automatically format files"
+
+set -e
+
+FIX_MODE="${usage_fix:-false}"
+echo "📝 Repo Formatting (Auto-Fix: $FIX_MODE)"
+
+TARGETS=(
+    "*"
+    #".github/**/*.{yml,yaml}"
+    "config/*.{yml,yaml}"
+)
+
+if [ "$FIX_MODE" = "true" ]; then
+    npx prettier --write "${TARGETS[@]}" --ignore-unknown
+else
+    npx prettier --check "${TARGETS[@]}" --ignore-unknown
+fi
