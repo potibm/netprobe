@@ -126,6 +126,24 @@ func TestHTTPSCheckEvaluateNoClients(t *testing.T) {
 	assert.Contains(t, result.ErrorMessage, "No active network clients")
 }
 
+func TestHTTPSCheckEvaluateRoutesToIsolation(t *testing.T) {
+	// When ExpectUp is false, evaluate() should route to evaluateIsolation
+	check := &HTTPSCheck{ExpectUp: false}
+
+	noLeaks := HTTPSFacts{
+		netprobe_net.IP4: {IsUp: false},
+	}
+	result := check.evaluate(noLeaks)
+	assert.True(t, result.Success)
+
+	leaks := HTTPSFacts{
+		netprobe_net.IP4: {IsUp: true},
+	}
+	result = check.evaluate(leaks)
+	assert.False(t, result.Success)
+	assert.Contains(t, result.ErrorMessage, "SECURITY ALERT")
+}
+
 func TestHTTPSCheckGatherSingleFactsSuccess(t *testing.T) {
 	check := &HTTPSCheck{URL: "https://example.com/"}
 	resp := &http.Response{
@@ -238,4 +256,38 @@ func TestHTTPSCheckExecuteFailure(t *testing.T) {
 
 	result := check.Execute(clients, newDiscardLogger())
 	assert.False(t, result.Success)
+}
+
+func TestHTTPSCheckExecuteIsolationSuccess(t *testing.T) {
+	// Service is down → isolation confirmed
+	check := &HTTPSCheck{URL: "https://example.com/", ExpectUp: false}
+
+	resp := &http.Response{
+		StatusCode: http.StatusNotFound,
+		Body:       io.NopCloser(strings.NewReader("Not Found")),
+	}
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(resp, nil),
+	}
+
+	result := check.Execute(clients, newDiscardLogger())
+	assert.True(t, result.Success)
+	assert.Equal(t, "HTTPS", result.CheckName)
+}
+
+func TestHTTPSCheckExecuteIsolationFailure(t *testing.T) {
+	// Service is up when it should be isolated → security alert
+	check := &HTTPSCheck{URL: "https://example.com/", ExpectUp: false}
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("OK")),
+	}
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(resp, nil),
+	}
+
+	result := check.Execute(clients, newDiscardLogger())
+	assert.False(t, result.Success)
+	assert.Contains(t, result.ErrorMessage, "SECURITY ALERT")
 }

@@ -162,3 +162,10 @@ func TestSelectIPByFamilyUnknown(t *testing.T) {
 	assert.Nil(t, ip)
 	assert.Contains(t, err.Error(), "unknown family")
 }
+
+func TestPickInterfaceIPInvalid(t *testing.T) {
+	ip, err := PickInterfaceIP("nonexistent0", IP4, true)
+	assert.Error(t, err)
+	assert.Nil(t, ip)
+	assert.Contains(t, err.Error(), "InterfaceByName")
+}
