@@ -1,8 +1,8 @@
 name: "example configuration"
 
 defaults:
-  interval: "30s"
-  timeout: "3s"
+  interval_seconds: 30
+  timeout_seconds: 3
   retries: 2
   slack_channel: "#netprobe"
 

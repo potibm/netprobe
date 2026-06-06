@@ -11,10 +11,6 @@ import (
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
 )
 
-const (
-	defaultTimeout = 5 * time.Second
-)
-
 type CheckRunner struct {
 	targets []domain.Target
 	logger  *slog.Logger
@@ -37,8 +33,10 @@ func NewCheckRunner(
 		cfg:     cfg.Defaults,
 	}
 
+	timeout := time.Duration(cfg.Defaults.TimeoutSeconds) * time.Second
+
 	if family == netprobe_net.IP4 || family == netprobe_net.IPAuto {
-		if client, err := createClientForInterface(iface, netprobe_net.IP4, defaultTimeout); err == nil {
+		if client, err := createClientForInterface(iface, netprobe_net.IP4, timeout); err == nil {
 			runner.clients[netprobe_net.IP4] = client
 		} else {
 			logger.Warn("⚠️ Could not create IPv4 client for interface", "interface", iface, "error", err)
@@ -46,7 +44,7 @@ func NewCheckRunner(
 	}
 
 	if family == netprobe_net.IP6 || family == netprobe_net.IPAuto {
-		if client, err := createClientForInterface(iface, netprobe_net.IP6, defaultTimeout); err == nil {
+		if client, err := createClientForInterface(iface, netprobe_net.IP6, timeout); err == nil {
 			runner.clients[netprobe_net.IP6] = client
 		} else {
 			logger.Warn("⚠️ Could not create IPv6 client for interface", "interface", iface, "error", err)
@@ -57,8 +55,26 @@ func NewCheckRunner(
 }
 
 func (cr *CheckRunner) Run(ctx context.Context) {
-	// @todo we need a ticker here to run this periodically, but for now we just run it once
+	cr.logger.Info("🚀 Starting CheckRunner loop", "interval", cr.cfg.IntervalSeconds)
+
+	interval := time.Duration(cr.cfg.IntervalSeconds) * time.Second
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
 	cr.runOnce()
+
+	for {
+		select {
+		case <-ctx.Done():
+			cr.logger.Info("🛑 Shutting down CheckRunner gracefully")
+
+			return
+
+		case <-ticker.C:
+			cr.runOnce()
+		}
+	}
 }
 
 func (cr *CheckRunner) runOnce() {
@@ -71,10 +87,20 @@ func (cr *CheckRunner) runOnce() {
 			log.Debug("Running check", "check", check.Name())
 			result := check.Execute(cr.clients, log)
 
-			if !result.Success {
-				log.Error("❌ Check failed", "check", result.CheckName, "error", result.ErrorMessage)
-				// @TODO more actions beep (or similar)
-			}
+			cr.handleResult(target, result, log)
 		}
 	}
+}
+
+func (cr *CheckRunner) handleResult(target domain.Target, result domain.CheckResult, log *slog.Logger) {
+	if result.Success {
+		log.Debug("✅ Check passed", "check", result.CheckName)
+
+		return
+	}
+
+	log.Error("❌ Check failed",
+		"check", result.CheckName,
+		"error", result.ErrorMessage,
+	)
 }
