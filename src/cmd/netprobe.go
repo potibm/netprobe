@@ -21,7 +21,7 @@ func NewCheckCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "netprobe",
 		Short:   "A network monitoring tool for the Evoke demoparty",
-		Version: version,
+		Version: Version,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
@@ -30,7 +30,7 @@ func NewCheckCmd() *cobra.Command {
 
 			logger := slog.Default().With("app", "netprobe")
 
-			logger.Info("🚀 Starting netprobe", "version", version)
+			logger.Info("🚀 Starting netprobe", "version", Version)
 
 			iface := viper.GetString("interface")
 			configFile := viper.GetString("config")

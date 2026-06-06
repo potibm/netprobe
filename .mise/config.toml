@@ -8,11 +8,11 @@ actionlint = "1.7.12"
 
 [tasks.build]
 description = "Build the Go application"
-run = "mkdir -p artifacts/build && go build -ldflags '-X main.version=$(NOW)' -o artifacts/build/netprobe ./src/cmd "
+run = "mkdir -p artifacts/build && go build -o artifacts/build/netprobe ./src/cmd "
 
 [tasks.run]
 description = "Run the Go application"
-run = "go run -ldflags '-X main.version=$(NOW)' .  --log-level debug --interface en0 --config config/example.yaml --ip-family auto"
+run = "go run . --log-level debug --interface en0 --config config/example.yaml --ip-family auto"
 
 [tasks.lint]
 description = "Lint the Go code"

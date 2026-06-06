@@ -9,7 +9,7 @@ import (
 	"syscall"
 )
 
-var version = "0.0.0"
+var Version = "0.0.0"
 
 func Execute() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
