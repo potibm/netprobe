@@ -85,12 +85,11 @@ func TestHttpsProbeConfigExpectValidCert(t *testing.T) {
 }
 
 func TestWebsocketProbeConfigUrl(t *testing.T) {
-	nourl := WebsocketProbeConfig{ExpectUp: true}
+	nourl := WebsocketProbeConfig{}
 	assert.Equal(t, "wss://example.com/ws", nourl.GetURL("example.com"))
 
 	withurl := WebsocketProbeConfig{
-		URL:      strPtr("ws://custom-url.com/socket"),
-		ExpectUp: true,
+		URL: strPtr("ws://custom-url.com/socket"),
 	}
 	assert.Equal(t, "ws://custom-url.com/socket", withurl.GetURL("example.com"))
 }
@@ -144,9 +143,7 @@ func TestBuildTargets(t *testing.T) {
 					ExpectUp:               true,
 					ExpectValidCertificate: &falseVal,
 				},
-				Websocket: &WebsocketProbeConfig{
-					ExpectUp: true,
-				},
+				Websocket: &WebsocketProbeConfig{},
 			},
 			{
 				ID:       "p2",

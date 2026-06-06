@@ -68,7 +68,7 @@ func NewCheckCmd() *cobra.Command {
 	cmd.Flags().StringP("interface", "i", "", "Network interface to bind to (required)")
 	cmd.Flags().StringP("config", "c", "", "Path to probe configuration file (required)")
 	cmd.Flags().String("log-level", "info", "Logging level (debug, info, warn, error)")
-	cmd.Flags().String("ip-family", "4", "IP family to use (4, 6, auto)")
+	cmd.Flags().String("ip-family", "auto", "IP family to use (4, 6, auto)")
 
 	_ = viper.BindPFlags(cmd.Flags())
 

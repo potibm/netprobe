@@ -3,8 +3,6 @@ name: "example configuration"
 defaults:
   interval_seconds: 30
   timeout_seconds: 3
-  retries: 2
-  slack_channel: "#netprobe"
 
 probes:
   - id: "portal"

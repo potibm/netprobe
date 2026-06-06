@@ -67,8 +67,7 @@ func (c *HTTPSProbeConfig) DoesExpectValidCert() bool {
 }
 
 type WebsocketProbeConfig struct {
-	URL      *string `yaml:"url,omitempty"`
-	ExpectUp bool    `yaml:"expect_up"`
+	URL *string `yaml:"url,omitempty"`
 }
 
 func (c *WebsocketProbeConfig) GetURL(hostname string) string {
