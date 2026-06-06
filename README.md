@@ -21,13 +21,13 @@ You want to ensure that your internal API is reachable from the Organizer networ
 2. You create `config/guest-net.yaml` (expecting the API to be ISOLATED).
 3. You run two instances of `netprobe` bound to their respective interfaces:
 
-   # Terminal 1: Testing from the Organizer VLAN
+```bash
+# Terminal 1: Testing from the Organizer VLAN
+./netprobe --interface vlan10 --config config/orga-net.yaml
 
-   ./netprobe --interface vlan10 --config config/orga-net.yaml
-
-   # Terminal 2: Testing from the Guest VLAN
-
-   ./netprobe --interface vlan20 --config config/guest-net.yaml
+# Terminal 2: Testing from the Guest VLAN
+./netprobe --interface vlan20 --config config/guest-net.yaml
+```
 
 ---
 
@@ -72,7 +72,7 @@ The application automatically loads a `.env` file in the working directory if it
 
 Every CLI flag can be overridden using environment variables prefixed with `NETPROBE_`:
 
-```
+```env
 # .env example
 NETPROBE_INTERFACE=vlan50
 NETPROBE_CONFIG=/app/config/party-net.yaml
@@ -92,46 +92,46 @@ Because most check parameters have sensible defaults, you only need to specify w
 
 ### Example Configuration
 
-```
+```yaml
 name: "Evoke 2026 Core Infrastructure"
 defaults:
-    interval_seconds: 30
-    timeout_seconds: 3
+  interval_seconds: 30
+  timeout_seconds: 3
 
 probes:
-    # ---------------------------------------------------------
-    # Target 1: Public Website (Expected to be fully reachable)
-    # ---------------------------------------------------------
-      - id: "public-website"
-        hostname: "www.evoke.example.com"
-        http:
-            url: "http://www.evoke.example.com"
-            expect_up: true
-            expect_redirect_to_httpsHTTPS: true
+  # ---------------------------------------------------------
+  # Target 1: Public Website (Expected to be fully reachable)
+  # ---------------------------------------------------------
+  - id: "public-website"
+    hostname: "www.evoke.example.com"
+    http:
+      url: "http://www.evoke.example.com"
+      expect_up: true
+      expect_redirect_to_httpsHTTPS: true
 
-        https:
-            url: "https://www.evoke.example.com"
-            expect_up: true
-            expect_valid_cert: true
+    https:
+      url: "https://www.evoke.example.com"
+      expect_up: true
+      expect_valid_cert: true
 
-    # ---------------------------------------------------------
-    # Target 2: Internal API (Expected to be BLOCKED / ISOLATED)
-    # ---------------------------------------------------------
-      - id: "internal-api"
-        hostname: "api.party.evoke.example.com"
-        https:
-            url: "https://api.party.evoke.example.com"
-            expect_up: false     # Triggers a Security Alert if reachable!
-            expect_valid_cert: false # Expected down, but if it leaks, cert might be self-signed.
+  # ---------------------------------------------------------
+  # Target 2: Internal API (Expected to be BLOCKED / ISOLATED)
+  # ---------------------------------------------------------
+  - id: "internal-api"
+    hostname: "api.party.evoke.example.com"
+    https:
+      url: "https://api.party.evoke.example.com"
+      expect_up: false # Triggers a Security Alert if reachable!
+      expect_valid_cert: false # Expected down, but if it leaks, cert might be self-signed.
 
-    # ---------------------------------------------------------
-    # Target 3: Live Stream WebSocket (Checking proxy upgrades)
-    # ---------------------------------------------------------
-      - id: "stream-socket"
-        hostname: "stream.evoke.example.com"
-        websocket:
-            url: "wss://stream.evoke.example.com/ws"
-            # WebSockets implicitly expect a successful connection and protocol upgrade.
+  # ---------------------------------------------------------
+  # Target 3: Live Stream WebSocket (Checking proxy upgrades)
+  # ---------------------------------------------------------
+  - id: "stream-socket"
+    hostname: "stream.evoke.example.com"
+    websocket:
+      url: "wss://stream.evoke.example.com/ws"
+      # WebSockets implicitly expect a successful connection and protocol upgrade.
 ```
 
 ### Check Types & Attributes
