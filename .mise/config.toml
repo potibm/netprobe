@@ -10,9 +10,9 @@ actionlint = "1.7.12"
 description = "Build the Go application"
 run = "mkdir -p artifacts/build && go build -o artifacts/build/netprobe ./src/cmd "
 
-[tasks.run]
+[tasks.dev]
 description = "Run the Go application"
-run = "go run . --log-level debug --interface en0 --config config/example.yaml --ip-family auto"
+run = "go run . --interface en0 --config config/example.yaml"
 
 [tasks.lint]
 description = "Lint the Go code"

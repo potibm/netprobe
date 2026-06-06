@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/potibm/netprobe/src/internal/checks"
 	"github.com/potibm/netprobe/src/internal/config"
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
@@ -24,6 +25,8 @@ func NewCheckCmd() *cobra.Command {
 		Version: Version,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
+
+			_ = godotenv.Load()
 
 			logLevel := getSlogLevel(viper.GetString("log-level"))
 			slog.SetLogLoggerLevel(logLevel)
