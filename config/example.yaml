@@ -1,0 +1,31 @@
+name: "example configuration"
+
+defaults:
+  interval_seconds: 30
+  timeout_seconds: 3
+
+probes:
+  - id: "portal"
+    hostname: "www.evoke.eu"
+
+    http:
+      expect_up: true
+      expect_redirect_to_https: true
+
+    https:
+      expect_up: true
+      expect_valid_cert: true
+
+    websocket:
+      expect_up: true
+
+  - id: "legacy-internal"
+    hostname: "legacy.evoke.local"
+
+    http:
+      url: "http://legacy.evoke.local/"
+      expect_up: false
+      expect_redirect_to_https: false
+
+    https:
+      expect_up: false

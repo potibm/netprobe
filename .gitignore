@@ -1,1 +1,5 @@
 artifacts/
+# Added by goreleaser init:
+dist/
+.DS_Store
+.idea/

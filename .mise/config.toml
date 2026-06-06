@@ -1,0 +1,74 @@
+[tools]
+go = "1.26"
+golangci-lint = "2.12.2"
+dotenv-linter = "4.0.0"
+"go:github.com/icholy/gomajor" = "0.15.0"
+"go:github.com/google/go-licenses/v2" = "2.0.1"
+actionlint = "1.7.12"
+goreleaser = "latest"
+
+[tasks.build]
+description = "Build the Go application"
+run = "mkdir -p artifacts/build && go build -o artifacts/build/netprobe ./src/cmd"
+
+[tasks."build:snapshot"]
+description = "Cross-compile binaries foapsr all platforms without creating archives (CI/Dry-Run)"
+run = "goreleaser build --snapshot --clean"
+
+[tasks."release:local"]
+description = "Simulate a full release locally (Builds binaries AND creates .tar.gz/.zip in artifacts/dist)"
+run = "goreleaser release --snapshot --clean"
+
+[tasks.dev]
+description = "Run the Go application"
+run = "go run . --interface en0 --config config/example.yaml"
+
+[tasks.lint]
+description = "Lint the Go code"
+usage = """
+flag "--fix" help="Automatically fix linting issues"
+"""
+run = """
+    : "🚦 Orchestration (Auto-Fix: ${usage_fix:-false})"
+    if [ "$usage_fix" = "true" ]; then
+        mise run be:lint --fix ::: repo:lint --fix
+    else
+        mise run be:lint ::: repo:lint
+    fi
+"""
+
+[tasks.test]
+description = "Run tests for the Go application"
+run = """
+    mkdir -p artifacts/coverage
+    go test -cover -coverprofile=artifacts/coverage/coverage.out -coverpkg=./... -v ./src/...
+	go tool cover -html=artifacts/coverage/coverage.out -o artifacts/coverage/coverage.html
+"""
+
+[tasks."deps:install"]
+description = "Install dependencies"
+run = """
+	go mod download
+"""
+
+[tasks."deps:update"]
+description = "Update all dependencies"
+run = """
+    mise up --bump --interactive
+    mise run be:deps:update ::: actions:deps:update
+"""
+
+[tasks."be:deps:update"]
+description = "Update Go module dependencies"
+run = """
+    go get -u -t ./...
+	go mod tidy
+    gomajor list
+"""
+
+[tasks."actions:deps:update"]
+description = "Update GitHub Actions versions"
+run = """
+  : "🐙 Update GitHub Actions"
+  npx actions-up
+"""
