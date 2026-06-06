@@ -8,7 +8,6 @@ import (
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
 )
 
-
 type HTTPProtocolFacts struct {
 	Error          error
 	StatusCode     int
@@ -20,7 +19,9 @@ func (f *HTTPProtocolFacts) HasCorrectRedirect(expected bool) bool {
 	if f == nil || f.Error != nil || !f.IsUp {
 		return false
 	}
+
 	actualRedirect := f.RedirectScheme == "https"
+
 	return actualRedirect == expected
 }
 
@@ -34,6 +35,7 @@ type HTTPFacts map[netprobe_net.IPFamily]*HTTPProtocolFacts
 
 func (facts HTTPFacts) IsUp(family netprobe_net.IPFamily) bool {
 	f := facts[family]
+
 	return f != nil && f.Error == nil && f.IsUp
 }
 
@@ -43,6 +45,7 @@ func (facts HTTPFacts) AnyUp() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -51,7 +54,9 @@ func (facts HTTPFacts) HasCorrectRedirect(family netprobe_net.IPFamily, expected
 	if f == nil || f.Error != nil || !f.IsUp {
 		return false
 	}
+
 	actualRedirect := f.RedirectScheme == "https"
+
 	return actualRedirect == expected
 }
 
@@ -59,6 +64,7 @@ func (facts HTTPFacts) StatusCode(family netprobe_net.IPFamily) int {
 	if f := facts[family]; f != nil {
 		return f.StatusCode
 	}
+
 	return 0
 }
 
@@ -126,6 +132,7 @@ func (c *HTTPCheck) evaluate(facts HTTPFacts) CheckResult {
 	if c.ExpectUp {
 		return c.evaluateAvailability(facts)
 	}
+
 	return c.evaluateIsolation(facts)
 }
 
@@ -140,9 +147,12 @@ func (c *HTTPCheck) evaluateIsolation(facts HTTPFacts) CheckResult {
 
 	if len(leaks) > 0 {
 		return CheckResult{
-			CheckName:    c.Name(),
-			Success:      false,
-			ErrorMessage: fmt.Sprintf("🚨 SECURITY ALERT: Service should be isolated, but is responding over: %v", leaks),
+			CheckName: c.Name(),
+			Success:   false,
+			ErrorMessage: fmt.Sprintf(
+				"🚨 SECURITY ALERT: Service should be isolated, but is responding over: %v",
+				leaks,
+			),
 		}
 	}
 

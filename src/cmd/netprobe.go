@@ -78,4 +78,3 @@ func NewCheckCmd() *cobra.Command {
 
 	return cmd
 }
-

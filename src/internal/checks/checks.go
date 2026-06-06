@@ -8,7 +8,6 @@ import (
 
 	"github.com/potibm/netprobe/src/internal/config"
 	"github.com/potibm/netprobe/src/internal/domain"
-	"github.com/potibm/netprobe/src/internal/net"
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
 )
 
@@ -30,7 +29,6 @@ func NewCheckRunner(
 	family netprobe_net.IPFamily,
 	logger *slog.Logger,
 ) *CheckRunner {
-
 	runner := &CheckRunner{
 		targets: cfg.BuildTargets(),
 		clients: make(map[netprobe_net.IPFamily]*http.Client),
@@ -39,17 +37,17 @@ func NewCheckRunner(
 		cfg:     cfg.Defaults,
 	}
 
-	if family == net.IP4 || family == net.IPAuto {
-		if client, err := createClientForInterface(iface, net.IP4, defaultTimeout); err == nil {
-			runner.clients[net.IP4] = client
+	if family == netprobe_net.IP4 || family == netprobe_net.IPAuto {
+		if client, err := createClientForInterface(iface, netprobe_net.IP4, defaultTimeout); err == nil {
+			runner.clients[netprobe_net.IP4] = client
 		} else {
 			logger.Warn("⚠️ Could not create IPv4 client for interface", "interface", iface, "error", err)
 		}
 	}
 
-	if family == net.IP6 || family == net.IPAuto {
-		if client, err := createClientForInterface(iface, net.IP6, defaultTimeout); err == nil {
-			runner.clients[net.IP6] = client
+	if family == netprobe_net.IP6 || family == netprobe_net.IPAuto {
+		if client, err := createClientForInterface(iface, netprobe_net.IP6, defaultTimeout); err == nil {
+			runner.clients[netprobe_net.IP6] = client
 		} else {
 			logger.Warn("⚠️ Could not create IPv6 client for interface", "interface", iface, "error", err)
 		}

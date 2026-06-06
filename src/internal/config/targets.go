@@ -32,7 +32,7 @@ func (c *Config) BuildTargets() []domain.Target {
 
 		if probe.Websocket != nil {
 			target.Checks = append(target.Checks, &domain.WebsocketCheck{
-				URL:      probe.Websocket.GetURL(probe.Hostname),
+				URL: probe.Websocket.GetURL(probe.Hostname),
 			})
 		}
 

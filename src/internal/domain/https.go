@@ -12,20 +12,21 @@ import (
 type HTTPSCheck struct {
 	URL             string
 	ExpectUp        bool
-	ExpectValidCert bool 
+	ExpectValidCert bool
 }
 
 type HTTPSProtocolFacts struct {
-	Error          error
-	StatusCode     int
-	IsUp           bool
-	ValidCert      bool
+	Error      error
+	StatusCode int
+	IsUp       bool
+	ValidCert  bool
 }
 
 func (f *HTTPSProtocolFacts) HasExpectedCert(expected bool) bool {
 	if f == nil {
 		return false
 	}
+
 	return f.ValidCert == expected
 }
 
@@ -33,6 +34,7 @@ type HTTPSFacts map[netprobe_net.IPFamily]*HTTPSProtocolFacts
 
 func (facts HTTPSFacts) IsUp(family netprobe_net.IPFamily) bool {
 	f := facts[family]
+
 	return f != nil && f.IsUp
 }
 
@@ -42,6 +44,7 @@ func (facts HTTPSFacts) AnyUp() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
@@ -49,6 +52,7 @@ func (facts HTTPSFacts) StatusCode(family netprobe_net.IPFamily) int {
 	if f := facts[family]; f != nil {
 		return f.StatusCode
 	}
+
 	return 0
 }
 
@@ -57,7 +61,6 @@ func (c *HTTPSCheck) Name() string {
 }
 
 func (c *HTTPSCheck) Execute(clients ClientList, log *slog.Logger) CheckResult {
-
 	facts := c.gatherFacts(clients)
 
 	result := c.evaluate(facts)
@@ -85,26 +88,27 @@ func (c *HTTPSCheck) gatherSingleFacts(client *http.Client) *HTTPSProtocolFacts 
 	pFacts := &HTTPSProtocolFacts{}
 
 	resp, err := client.Get(c.URL)
-	
 	if err != nil {
 		pFacts.Error = err
-		
+
 		// Trick: Check whether the error was a certificate or TLS error
 		if strings.Contains(err.Error(), "x509: certificate") || strings.Contains(err.Error(), "tls:") {
 			pFacts.IsUp = true       // <-- IMPORTANT: Port 443 was open!
 			pFacts.ValidCert = false // <-- But the certificate is invalid
 		} else {
 			// Real network error (e.g. no route to host, timeout)
-			pFacts.IsUp = false 
+			pFacts.IsUp = false
 		}
+
 		return pFacts
 	}
+
 	defer resp.Body.Close()
 
 	// If err == nil, Go has successfully validated the connection AND the certificate
-	pFacts.ValidCert = true 
+	pFacts.ValidCert = true
 	pFacts.StatusCode = resp.StatusCode
-	pFacts.IsUp = resp.StatusCode >= 200 && resp.StatusCode < 400
+	pFacts.IsUp = resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusBadRequest
 
 	return pFacts
 }
@@ -121,10 +125,11 @@ func (c *HTTPSCheck) evaluate(facts HTTPSFacts) CheckResult {
 	if c.ExpectUp {
 		return c.evaluateAvailability(facts)
 	}
+
 	return c.evaluateIsolation(facts)
 }
 
-// Scenario 1: We expect isolation (firewall blocks)
+// Scenario 1: We expect isolation (firewall blocks).
 func (c *HTTPSCheck) evaluateIsolation(facts HTTPSFacts) CheckResult {
 	var leaks []string
 
@@ -136,16 +141,19 @@ func (c *HTTPSCheck) evaluateIsolation(facts HTTPSFacts) CheckResult {
 
 	if len(leaks) > 0 {
 		return CheckResult{
-			CheckName:    c.Name(),
-			Success:      false,
-			ErrorMessage: fmt.Sprintf("🚨 SECURITY ALERT: Service should be isolated, but is responding on port 443 over: %v", leaks),
+			CheckName: c.Name(),
+			Success:   false,
+			ErrorMessage: fmt.Sprintf(
+				"🚨 SECURITY ALERT: Service should be isolated, but is responding on port 443 over: %v",
+				leaks,
+			),
 		}
 	}
 
 	return CheckResult{CheckName: c.Name(), Success: true}
 }
 
-// Scenario 2: We expect availability
+// Scenario 2: We expect availability.
 func (c *HTTPSCheck) evaluateAvailability(facts HTTPSFacts) CheckResult {
 	// 1. OR logic (at least one path must work)
 	if !facts.AnyUp() {
@@ -163,6 +171,7 @@ func (c *HTTPSCheck) evaluateAvailability(facts HTTPSFacts) CheckResult {
 			if c.ExpectValidCert {
 				msg = "valid"
 			}
+
 			return CheckResult{
 				CheckName:    c.Name(),
 				Success:      false,

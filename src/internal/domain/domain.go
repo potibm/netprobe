@@ -9,7 +9,6 @@ import (
 
 type ClientList map[netprobe_net.IPFamily]*http.Client
 
-
 type Check interface {
 	Name() string
 	Execute(clients ClientList, log *slog.Logger) CheckResult

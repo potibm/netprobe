@@ -12,20 +12,21 @@ import (
 )
 
 type WebsocketCheck struct {
-	URL             string
+	URL string
 }
 
 type WebsocketProtocolFacts struct {
 	Error               error
 	StatusCode          int
 	IsUp                bool
-	HandshakeSuccessful bool 
+	HandshakeSuccessful bool
 }
 
 type WebsocketFacts map[netprobe_net.IPFamily]*WebsocketProtocolFacts
 
 func (facts WebsocketFacts) IsUp(family netprobe_net.IPFamily) bool {
 	f := facts[family]
+
 	return f != nil && f.IsUp
 }
 
@@ -35,15 +36,15 @@ func (facts WebsocketFacts) AnyUp() bool {
 			return true
 		}
 	}
+
 	return false
 }
 
 func (c *WebsocketCheck) Name() string {
-    return "WEBSOCKET"
+	return "WEBSOCKET"
 }
 
 func (c *WebsocketCheck) Execute(clients ClientList, log *slog.Logger) CheckResult {
-
 	facts := c.gatherFacts(clients)
 
 	result := c.evaluate(facts)
@@ -75,9 +76,10 @@ func (c *WebsocketCheck) gatherSingleFacts(client *http.Client) *WebsocketProtoc
 	httpURL = strings.Replace(httpURL, "ws://", "http://", 1)
 	httpURL = strings.Replace(httpURL, "wss://", "https://", 1)
 
-	req, err := http.NewRequest("GET", httpURL, nil)
+	req, err := http.NewRequest(http.MethodGet, httpURL, http.NoBody)
 	if err != nil {
 		pFacts.Error = err
+
 		return pFacts
 	}
 
@@ -85,9 +87,11 @@ func (c *WebsocketCheck) gatherSingleFacts(client *http.Client) *WebsocketProtoc
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Sec-WebSocket-Version", "13")
-	
+
 	// A random key is required by RFC
-	nonce := make([]byte, 16)
+	const keyLength = 16
+
+	nonce := make([]byte, keyLength)
 	_, _ = rand.Read(nonce)
 	req.Header.Set("Sec-WebSocket-Key", base64.StdEncoding.EncodeToString(nonce))
 
@@ -95,15 +99,16 @@ func (c *WebsocketCheck) gatherSingleFacts(client *http.Client) *WebsocketProtoc
 	if err != nil {
 		pFacts.Error = err
 		pFacts.IsUp = false
+
 		return pFacts
 	}
 	defer resp.Body.Close()
 
 	pFacts.StatusCode = resp.StatusCode
-	
+
 	// The port is responding, so the service is basically reachable (IsUp)
-	pFacts.IsUp = true 
-	
+	pFacts.IsUp = true
+
 	// RFC 6455: The server MUST respond with 101 if the upgrade succeeds
 	pFacts.HandshakeSuccessful = resp.StatusCode == http.StatusSwitchingProtocols
 
@@ -132,9 +137,13 @@ func (c *WebsocketCheck) evaluate(facts WebsocketFacts) CheckResult {
 	for family, f := range facts {
 		if facts.IsUp(family) && !f.HandshakeSuccessful {
 			return CheckResult{
-				CheckName:    c.Name(),
-				Success:      false,
-				ErrorMessage: fmt.Sprintf("[%s] HTTP connection established, but protocol upgrade failed (Status: %d). Check proxy configuration!", family, f.StatusCode),
+				CheckName: c.Name(),
+				Success:   false,
+				ErrorMessage: fmt.Sprintf(
+					"[%s] HTTP connection established, but protocol upgrade failed (Status: %d). Check proxy configuration!",
+					family,
+					f.StatusCode,
+				),
 			}
 		}
 	}
