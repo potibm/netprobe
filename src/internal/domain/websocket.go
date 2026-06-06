@@ -3,7 +3,6 @@ package domain
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -117,36 +116,20 @@ func (c *WebsocketCheck) gatherSingleFacts(client *http.Client) *WebsocketProtoc
 
 func (c *WebsocketCheck) evaluate(facts WebsocketFacts) CheckResult {
 	if len(facts) == 0 {
-		return CheckResult{
-			CheckName:    c.Name(),
-			Success:      false,
-			ErrorMessage: "No active network clients available for the WebSocket check",
-		}
+		return NewCheckResultFailure(c.Name(), ErrNoClients, "")
 	}
 
 	// 1. OR logic: At least one IP channel must be able to reach the service
 	if !facts.AnyUp() {
-		return CheckResult{
-			CheckName:    c.Name(),
-			Success:      false,
-			ErrorMessage: "WebSocket service is completely offline (not reachable via IPv4 or IPv6)",
-		}
+		return NewCheckResultFailure(c.Name(), ErrNotAvailable, "")
 	}
 
 	// 2. Every channel through which the server responds MUST complete the upgrade successfully
 	for family, f := range facts {
 		if facts.IsUp(family) && !f.HandshakeSuccessful {
-			return CheckResult{
-				CheckName: c.Name(),
-				Success:   false,
-				ErrorMessage: fmt.Sprintf(
-					"[%s] HTTP connection established, but protocol upgrade failed (Status: %d). Check proxy configuration!",
-					family,
-					f.StatusCode,
-				),
-			}
+			return NewCheckResultFailure(c.Name(), ErrWebsocketUpgradeFail, string(family), f.StatusCode)
 		}
 	}
 
-	return CheckResult{CheckName: c.Name(), Success: true}
+	return NewCheckResultSuccess(c.Name())
 }

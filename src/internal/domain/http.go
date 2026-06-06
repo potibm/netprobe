@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -122,11 +121,7 @@ func (c *HTTPCheck) gatherSingleFacts(client *http.Client) *HTTPProtocolFacts {
 
 func (c *HTTPCheck) evaluate(facts HTTPFacts) CheckResult {
 	if len(facts) == 0 {
-		return CheckResult{
-			CheckName:    c.Name(),
-			Success:      false,
-			ErrorMessage: "No active clients to perform the check",
-		}
+		return NewCheckResultFailure(c.Name(), ErrNoClients, "")
 	}
 
 	if c.ExpectUp {
@@ -146,39 +141,30 @@ func (c *HTTPCheck) evaluateIsolation(facts HTTPFacts) CheckResult {
 	}
 
 	if len(leaks) > 0 {
-		return CheckResult{
-			CheckName: c.Name(),
-			Success:   false,
-			ErrorMessage: fmt.Sprintf(
-				"🚨 SECURITY ALERT: Service should be isolated, but is responding over: %v",
-				leaks,
-			),
-		}
+		return NewCheckResultFailure(c.Name(), ErrUnexpectedUp, "", leaks)
 	}
 
-	return CheckResult{CheckName: c.Name(), Success: true}
+	return NewCheckResultSuccess(c.Name())
 }
 
 func (c *HTTPCheck) evaluateAvailability(facts HTTPFacts) CheckResult {
 	// 1. One of the interfaces must be UP
 	if !facts.AnyUp() {
-		return CheckResult{
-			CheckName:    c.Name(),
-			Success:      false,
-			ErrorMessage: "Service is completely offline (not reachable via IPv4 or IPv6)",
-		}
+		return NewCheckResultFailure(c.Name(), ErrNotAvailable, "")
 	}
 
 	// 2. Any interface that is UP must have the correct redirect behavior
 	for family, f := range facts {
 		if facts.IsUp(family) && !f.HasCorrectRedirect(c.ExpectRedirectToHTTPS) {
-			return CheckResult{
-				CheckName:    c.Name(),
-				Success:      false,
-				ErrorMessage: fmt.Sprintf("[%s] Wrong redirect behavior (HTTP Status: %d)", family, f.StatusCode),
-			}
+			return NewCheckResultFailure(
+				c.Name(),
+				ErrWrongRedirect,
+				string(family),
+				c.ExpectRedirectToHTTPS,
+				f.StatusCode,
+			)
 		}
 	}
 
-	return CheckResult{CheckName: c.Name(), Success: true}
+	return NewCheckResultSuccess(c.Name())
 }

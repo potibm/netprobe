@@ -72,7 +72,7 @@ func (cr *CheckRunner) runOnce() {
 			result := check.Execute(cr.clients, log)
 
 			if !result.Success {
-				log.Debug("Check failed", "check", result.CheckName, "error", result.ErrorMessage)
+				log.Error("❌ Check failed", "check", result.CheckName, "error", result.ErrorMessage)
 				// @TODO more actions beep (or similar)
 			}
 		}

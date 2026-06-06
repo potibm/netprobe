@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -115,11 +114,7 @@ func (c *HTTPSCheck) gatherSingleFacts(client *http.Client) *HTTPSProtocolFacts 
 
 func (c *HTTPSCheck) evaluate(facts HTTPSFacts) CheckResult {
 	if len(facts) == 0 {
-		return CheckResult{
-			CheckName:    c.Name(),
-			Success:      false,
-			ErrorMessage: "No active network clients available for the check",
-		}
+		return NewCheckResultFailure(c.Name(), ErrNoClients, "")
 	}
 
 	if c.ExpectUp {
@@ -140,28 +135,17 @@ func (c *HTTPSCheck) evaluateIsolation(facts HTTPSFacts) CheckResult {
 	}
 
 	if len(leaks) > 0 {
-		return CheckResult{
-			CheckName: c.Name(),
-			Success:   false,
-			ErrorMessage: fmt.Sprintf(
-				"🚨 SECURITY ALERT: Service should be isolated, but is responding on port 443 over: %v",
-				leaks,
-			),
-		}
+		return NewCheckResultFailure(c.Name(), ErrUnexpectedUp, "", leaks)
 	}
 
-	return CheckResult{CheckName: c.Name(), Success: true}
+	return NewCheckResultSuccess(c.Name())
 }
 
 // Scenario 2: We expect availability.
 func (c *HTTPSCheck) evaluateAvailability(facts HTTPSFacts) CheckResult {
 	// 1. OR logic (at least one path must work)
 	if !facts.AnyUp() {
-		return CheckResult{
-			CheckName:    c.Name(),
-			Success:      false,
-			ErrorMessage: "Service is completely offline (not reachable via IPv4 or IPv6)",
-		}
+		return NewCheckResultFailure(c.Name(), ErrNotAvailable, "")
 	}
 
 	// 2. Validate certificate (but only on active channels)
@@ -172,13 +156,9 @@ func (c *HTTPSCheck) evaluateAvailability(facts HTTPSFacts) CheckResult {
 				msg = "valid"
 			}
 
-			return CheckResult{
-				CheckName:    c.Name(),
-				Success:      false,
-				ErrorMessage: fmt.Sprintf("[%s] Certificate does not meet expectation (Expected: %s)", family, msg),
-			}
+			return NewCheckResultFailure(c.Name(), ErrInvalidCertificate, string(family), msg)
 		}
 	}
 
-	return CheckResult{CheckName: c.Name(), Success: true}
+	return NewCheckResultSuccess(c.Name())
 }
