@@ -1,6 +1,9 @@
 package domain
 
 import (
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
@@ -67,4 +70,99 @@ func TestWebsocketCheckEvaluate(t *testing.T) {
 	}
 	result = check.evaluate(allGood)
 	assert.True(t, result.Success)
+}
+
+func TestWebsocketCheckGatherSingleFactsHandshakeSuccess(t *testing.T) {
+	check := &WebsocketCheck{URL: "wss://example.com/ws"}
+	resp := &http.Response{
+		StatusCode: http.StatusSwitchingProtocols,
+		Body:       io.NopCloser(strings.NewReader("")),
+	}
+	client := newMockClient(resp, nil)
+
+	facts := check.gatherSingleFacts(client)
+	assert.NoError(t, facts.Error)
+	assert.True(t, facts.IsUp)
+	assert.True(t, facts.HandshakeSuccessful)
+	assert.Equal(t, http.StatusSwitchingProtocols, facts.StatusCode)
+}
+
+func TestWebsocketCheckGatherSingleFactsHandshakeRejected(t *testing.T) {
+	check := &WebsocketCheck{URL: "wss://example.com/ws"}
+	resp := &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body:       io.NopCloser(strings.NewReader("Forbidden")),
+	}
+	client := newMockClient(resp, nil)
+
+	facts := check.gatherSingleFacts(client)
+	assert.NoError(t, facts.Error)
+	assert.True(t, facts.IsUp)
+	assert.False(t, facts.HandshakeSuccessful)
+	assert.Equal(t, http.StatusForbidden, facts.StatusCode)
+}
+
+func TestWebsocketCheckGatherSingleFactsNetworkError(t *testing.T) {
+	check := &WebsocketCheck{URL: "wss://example.com/ws"}
+	client := newMockClient(nil, assert.AnError)
+
+	facts := check.gatherSingleFacts(client)
+	assert.Error(t, facts.Error)
+	assert.False(t, facts.IsUp)
+}
+
+func TestWebsocketCheckGatherFacts(t *testing.T) {
+	check := &WebsocketCheck{URL: "wss://example.com/ws"}
+
+	resp101 := &http.Response{
+		StatusCode: http.StatusSwitchingProtocols,
+		Body:       io.NopCloser(strings.NewReader("")),
+	}
+	resp403 := &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body:       io.NopCloser(strings.NewReader("Forbidden")),
+	}
+
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(resp101, nil),
+		netprobe_net.IP6: newMockClient(resp403, nil),
+	}
+
+	facts := check.gatherFacts(clients)
+	assert.Len(t, facts, 2)
+	assert.True(t, facts[netprobe_net.IP4].IsUp)
+	assert.True(t, facts[netprobe_net.IP4].HandshakeSuccessful)
+	assert.True(t, facts[netprobe_net.IP6].IsUp)
+	assert.False(t, facts[netprobe_net.IP6].HandshakeSuccessful)
+}
+
+func TestWebsocketCheckExecuteSuccess(t *testing.T) {
+	check := &WebsocketCheck{URL: "wss://example.com/ws"}
+
+	resp := &http.Response{
+		StatusCode: http.StatusSwitchingProtocols,
+		Body:       io.NopCloser(strings.NewReader("")),
+	}
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(resp, nil),
+	}
+
+	result := check.Execute(clients, newDiscardLogger())
+	assert.True(t, result.Success)
+	assert.Equal(t, "WEBSOCKET", result.CheckName)
+}
+
+func TestWebsocketCheckExecuteFailure(t *testing.T) {
+	check := &WebsocketCheck{URL: "wss://example.com/ws"}
+
+	resp := &http.Response{
+		StatusCode: http.StatusForbidden,
+		Body:       io.NopCloser(strings.NewReader("Forbidden")),
+	}
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(resp, nil),
+	}
+
+	result := check.Execute(clients, newDiscardLogger())
+	assert.False(t, result.Success)
 }

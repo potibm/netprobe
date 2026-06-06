@@ -1,6 +1,9 @@
 package domain
 
 import (
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
@@ -126,4 +129,112 @@ func TestHTTPCheckEvaluateNoClients(t *testing.T) {
 	result := check.evaluate(HTTPFacts{})
 	assert.False(t, result.Success)
 	assert.Contains(t, result.ErrorMessage, "No active network clients")
+}
+
+func TestHTTPCheckGatherSingleFactsSuccess(t *testing.T) {
+	check := &HTTPCheck{URL: "http://example.com/"}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("OK")),
+	}
+	client := newMockClient(resp, nil)
+
+	facts := check.gatherSingleFacts(client)
+	assert.NoError(t, facts.Error)
+	assert.True(t, facts.IsUp)
+	assert.Equal(t, http.StatusOK, facts.StatusCode)
+	assert.Empty(t, facts.RedirectScheme)
+}
+
+func TestHTTPCheckGatherSingleFactsNotFound(t *testing.T) {
+	check := &HTTPCheck{URL: "http://example.com/"}
+	resp := &http.Response{
+		StatusCode: http.StatusNotFound,
+		Body:       io.NopCloser(strings.NewReader("Not Found")),
+	}
+	client := newMockClient(resp, nil)
+
+	facts := check.gatherSingleFacts(client)
+	assert.NoError(t, facts.Error)
+	assert.False(t, facts.IsUp)
+	assert.Equal(t, http.StatusNotFound, facts.StatusCode)
+}
+
+func TestHTTPCheckGatherSingleFactsNetworkError(t *testing.T) {
+	check := &HTTPCheck{URL: "http://example.com/"}
+	client := newMockClient(nil, assert.AnError)
+
+	facts := check.gatherSingleFacts(client)
+	assert.Error(t, facts.Error)
+	assert.False(t, facts.IsUp)
+}
+
+func TestHTTPCheckGatherSingleFactsRedirect(t *testing.T) {
+	check := &HTTPCheck{URL: "http://example.com/"}
+	resp := &http.Response{
+		StatusCode: http.StatusMovedPermanently,
+		Header:     http.Header{"Location": []string{"https://example.com/"}},
+		Body:       io.NopCloser(strings.NewReader("")),
+	}
+	client := newMockClient(resp, nil)
+
+	facts := check.gatherSingleFacts(client)
+	assert.NoError(t, facts.Error)
+	assert.True(t, facts.IsUp)
+	assert.Equal(t, http.StatusMovedPermanently, facts.StatusCode)
+	assert.Equal(t, "https", facts.RedirectScheme)
+}
+
+func TestHTTPCheckGatherFacts(t *testing.T) {
+	check := &HTTPCheck{URL: "http://example.com/"}
+
+	respOK := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("OK")),
+	}
+	resp404 := &http.Response{
+		StatusCode: http.StatusNotFound,
+		Body:       io.NopCloser(strings.NewReader("Not Found")),
+	}
+
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(respOK, nil),
+		netprobe_net.IP6: newMockClient(resp404, nil),
+	}
+
+	facts := check.gatherFacts(clients)
+	assert.Len(t, facts, 2)
+	assert.True(t, facts[netprobe_net.IP4].IsUp)
+	assert.False(t, facts[netprobe_net.IP6].IsUp)
+}
+
+func TestHTTPCheckExecuteSuccess(t *testing.T) {
+	check := &HTTPCheck{URL: "http://example.com/", ExpectUp: true, ExpectRedirectToHTTPS: false}
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("OK")),
+	}
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(resp, nil),
+	}
+
+	result := check.Execute(clients, newDiscardLogger())
+	assert.True(t, result.Success)
+	assert.Equal(t, "HTTP", result.CheckName)
+}
+
+func TestHTTPCheckExecuteFailure(t *testing.T) {
+	check := &HTTPCheck{URL: "http://example.com/", ExpectUp: true, ExpectRedirectToHTTPS: false}
+
+	resp := &http.Response{
+		StatusCode: http.StatusNotFound,
+		Body:       io.NopCloser(strings.NewReader("Not Found")),
+	}
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(resp, nil),
+	}
+
+	result := check.Execute(clients, newDiscardLogger())
+	assert.False(t, result.Success)
 }

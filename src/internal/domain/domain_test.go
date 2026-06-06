@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"log/slog"
+	"net/http"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,4 +41,35 @@ func TestNewCheckResultSuccess(t *testing.T) {
 	assert.Equal(t, "HTTPS", result.CheckName)
 	assert.True(t, result.Success)
 	assert.Empty(t, result.ErrorMessage)
+}
+
+// mockRoundTripper implements http.RoundTripper for testing.
+type mockRoundTripper struct {
+	response *http.Response
+	err      error
+}
+
+func (m *mockRoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+
+	if m.response != nil {
+		m.response.Request = req
+	}
+
+	return m.response, nil
+}
+
+func newMockClient(resp *http.Response, err error) *http.Client {
+	return &http.Client{
+		Transport: &mockRoundTripper{response: resp, err: err},
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+}
+
+func newDiscardLogger() *slog.Logger {
+	return slog.New(slog.DiscardHandler)
 }

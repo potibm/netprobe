@@ -1,6 +1,10 @@
 package domain
 
 import (
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
 	"testing"
 
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
@@ -120,4 +124,118 @@ func TestHTTPSCheckEvaluateNoClients(t *testing.T) {
 	result := check.evaluate(HTTPSFacts{})
 	assert.False(t, result.Success)
 	assert.Contains(t, result.ErrorMessage, "No active network clients")
+}
+
+func TestHTTPSCheckGatherSingleFactsSuccess(t *testing.T) {
+	check := &HTTPSCheck{URL: "https://example.com/"}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("OK")),
+	}
+	client := newMockClient(resp, nil)
+
+	facts := check.gatherSingleFacts(client)
+	assert.NoError(t, facts.Error)
+	assert.True(t, facts.IsUp)
+	assert.True(t, facts.ValidCert)
+	assert.Equal(t, http.StatusOK, facts.StatusCode)
+}
+
+func TestHTTPSCheckGatherSingleFactsBadStatus(t *testing.T) {
+	check := &HTTPSCheck{URL: "https://example.com/"}
+	resp := &http.Response{
+		StatusCode: http.StatusNotFound,
+		Body:       io.NopCloser(strings.NewReader("Not Found")),
+	}
+	client := newMockClient(resp, nil)
+
+	facts := check.gatherSingleFacts(client)
+	assert.NoError(t, facts.Error)
+	assert.False(t, facts.IsUp)
+	assert.True(t, facts.ValidCert)
+	assert.Equal(t, http.StatusNotFound, facts.StatusCode)
+}
+
+func TestHTTPSCheckGatherSingleFactsCertError(t *testing.T) {
+	check := &HTTPSCheck{URL: "https://example.com/"}
+	client := newMockClient(nil, fmt.Errorf("x509: certificate signed by unknown authority"))
+
+	facts := check.gatherSingleFacts(client)
+	assert.Error(t, facts.Error)
+	assert.True(t, facts.IsUp)
+	assert.False(t, facts.ValidCert)
+}
+
+func TestHTTPSCheckGatherSingleFactsTLSError(t *testing.T) {
+	check := &HTTPSCheck{URL: "https://example.com/"}
+	client := newMockClient(nil, fmt.Errorf("tls: bad certificate"))
+
+	facts := check.gatherSingleFacts(client)
+	assert.Error(t, facts.Error)
+	assert.True(t, facts.IsUp)
+	assert.False(t, facts.ValidCert)
+}
+
+func TestHTTPSCheckGatherSingleFactsNetworkError(t *testing.T) {
+	check := &HTTPSCheck{URL: "https://example.com/"}
+	client := newMockClient(nil, fmt.Errorf("connection refused"))
+
+	facts := check.gatherSingleFacts(client)
+	assert.Error(t, facts.Error)
+	assert.False(t, facts.IsUp)
+	assert.False(t, facts.ValidCert)
+}
+
+func TestHTTPSCheckGatherFacts(t *testing.T) {
+	check := &HTTPSCheck{URL: "https://example.com/"}
+
+	respOK := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("OK")),
+	}
+	resp404 := &http.Response{
+		StatusCode: http.StatusNotFound,
+		Body:       io.NopCloser(strings.NewReader("Not Found")),
+	}
+
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(respOK, nil),
+		netprobe_net.IP6: newMockClient(resp404, nil),
+	}
+
+	facts := check.gatherFacts(clients)
+	assert.Len(t, facts, 2)
+	assert.True(t, facts[netprobe_net.IP4].IsUp)
+	assert.False(t, facts[netprobe_net.IP6].IsUp)
+}
+
+func TestHTTPSCheckExecuteSuccess(t *testing.T) {
+	check := &HTTPSCheck{URL: "https://example.com/", ExpectUp: true, ExpectValidCert: true}
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader("OK")),
+	}
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(resp, nil),
+	}
+
+	result := check.Execute(clients, newDiscardLogger())
+	assert.True(t, result.Success)
+	assert.Equal(t, "HTTPS", result.CheckName)
+}
+
+func TestHTTPSCheckExecuteFailure(t *testing.T) {
+	check := &HTTPSCheck{URL: "https://example.com/", ExpectUp: true, ExpectValidCert: true}
+
+	resp := &http.Response{
+		StatusCode: http.StatusNotFound,
+		Body:       io.NopCloser(strings.NewReader("Not Found")),
+	}
+	clients := ClientList{
+		netprobe_net.IP4: newMockClient(resp, nil),
+	}
+
+	result := check.Execute(clients, newDiscardLogger())
+	assert.False(t, result.Success)
 }
