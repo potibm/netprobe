@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/potibm/netprobe/src/internal/checks"
@@ -12,10 +11,6 @@ import (
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-)
-
-const (
-	defaultTimeout = 5 * time.Second
 )
 
 func NewCheckCmd() *cobra.Command {
