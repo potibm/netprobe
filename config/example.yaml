@@ -15,7 +15,7 @@ probes:
       expect_redirect_to_https: true
 
     https:
-      um expect_up: true
+      expect_up: true
       expect_valid_cert: true
 
     websocket:

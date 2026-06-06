@@ -3,8 +3,6 @@ package cmd
 import (
 	"fmt"
 	"log/slog"
-	"net"
-	"net/http"
 	"strings"
 	"time"
 
@@ -57,12 +55,7 @@ func NewCheckCmd() *cobra.Command {
 
 			logger.Info("⚙️ Loaded config", "name", cfg.Name, "probes", len(cfg.Probes))
 
-			client, err := httpClientForInterface(iface, ipFamily, defaultTimeout)
-			if err != nil {
-				return fmt.Errorf("❌ Failed to create HTTP client: %w", err)
-			}
-
-			checkRunner := checks.NewCheckRunner(cfg.Name, cfg.Defaults, cfg.BuildTargets(), client, logger)
+			checkRunner := checks.NewCheckRunner(*cfg, iface, ipFamily, logger)
 			checkRunner.Run(ctx)
 
 			return nil
@@ -86,30 +79,3 @@ func NewCheckCmd() *cobra.Command {
 	return cmd
 }
 
-func httpClientForInterface(iface string, family netprobe_net.IPFamily, timeout time.Duration) (*http.Client, error) {
-	ip, err := netprobe_net.PickInterfaceIP(iface, family, false)
-	if err != nil {
-		return nil, err
-	}
-
-	slog.Info("ᯤ Using interface", "interface", iface, "ip", ip.String(), "ipfamily", family)
-
-	dialer := &net.Dialer{
-		Timeout: timeout,
-		LocalAddr: &net.TCPAddr{
-			IP: ip,
-		},
-	}
-
-	transport := &http.Transport{
-		DialContext: dialer.DialContext,
-	}
-
-	return &http.Client{
-		Timeout:   timeout,
-		Transport: transport,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}, nil
-}

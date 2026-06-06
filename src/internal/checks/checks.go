@@ -4,33 +4,58 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/potibm/netprobe/src/internal/config"
 	"github.com/potibm/netprobe/src/internal/domain"
+	"github.com/potibm/netprobe/src/internal/net"
+	netprobe_net "github.com/potibm/netprobe/src/internal/net"
+)
+
+const (
+	defaultTimeout = 5 * time.Second
 )
 
 type CheckRunner struct {
 	targets []domain.Target
-	client  *http.Client
 	logger  *slog.Logger
 	name    string
 	cfg     config.Defaults
+	clients domain.ClientList
 }
 
 func NewCheckRunner(
-	name string,
-	cfg config.Defaults,
-	targets []domain.Target,
-	client *http.Client,
+	cfg config.Config,
+	iface string,
+	family netprobe_net.IPFamily,
 	logger *slog.Logger,
 ) *CheckRunner {
-	return &CheckRunner{
-		targets: targets,
-		client:  client,
-		logger:  logger.With("name", name),
-		name:    name,
-		cfg:     cfg,
+
+	runner := &CheckRunner{
+		targets: cfg.BuildTargets(),
+		clients: make(map[netprobe_net.IPFamily]*http.Client),
+		logger:  logger.With("name", cfg.Name),
+		name:    cfg.Name,
+		cfg:     cfg.Defaults,
 	}
+
+	if family == net.IP4 || family == net.IPAuto {
+		if client, err := createClientForInterface(iface, net.IP4, defaultTimeout); err == nil {
+			runner.clients[net.IP4] = client
+		} else {
+			logger.Warn("⚠️ Could not create IPv4 client for interface", "interface", iface, "error", err)
+		}
+	}
+
+	if family == net.IP6 || family == net.IPAuto {
+		if client, err := createClientForInterface(iface, net.IP6, defaultTimeout); err == nil {
+			runner.clients[net.IP6] = client
+		} else {
+			logger.Warn("⚠️ Could not create IPv6 client for interface", "interface", iface, "error", err)
+		}
+	}
+
+	return runner
 }
 
 func (cr *CheckRunner) Run(ctx context.Context) {
@@ -46,7 +71,7 @@ func (cr *CheckRunner) runOnce() {
 
 		for _, check := range target.Checks {
 			log.Debug("Running check", "check", check.Name())
-			result := check.Execute(cr.client, log)
+			result := check.Execute(cr.clients, log)
 
 			if !result.Success {
 				log.Debug("Check failed", "check", result.CheckName, "error", result.ErrorMessage)
