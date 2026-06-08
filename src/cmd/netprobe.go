@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/potibm/netprobe/src/internal/checks"
 	"github.com/potibm/netprobe/src/internal/config"
+	"github.com/potibm/netprobe/src/internal/initializer"
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -23,10 +23,17 @@ func NewCheckCmd() *cobra.Command {
 
 			_ = godotenv.Load()
 
-			logLevel := getSlogLevel(viper.GetString("log-level"))
-			slog.SetLogLoggerLevel(logLevel)
+			// Initialize telemetry
+			shutdownFn, err := initializer.InitTelemetry(ctx, viper.GetString("otel-endpoint"), Version)
+			if err != nil {
+				return fmt.Errorf("failed to initialize telemetry: %w", err)
+			}
 
-			logger := slog.Default().With("app", "netprobe")
+			if shutdownFn != nil {
+				defer shutdownFn()
+			}
+
+			logger := initializer.InitLogger(viper.GetString("log-format"), viper.GetString("log-level"))
 
 			logger.Info("🚀 Starting netprobe", "version", Version)
 
@@ -40,8 +47,6 @@ func NewCheckCmd() *cobra.Command {
 				iface,
 				"config",
 				configFile,
-				"loglevel",
-				logLevel,
 				"ipfamily",
 				ipFamily,
 			)
@@ -64,6 +69,8 @@ func NewCheckCmd() *cobra.Command {
 	cmd.Flags().StringP("config", "c", "", "Path to probe configuration file (required)")
 	cmd.Flags().String("log-level", "info", "Logging level (debug, info, warn, error)")
 	cmd.Flags().String("ip-family", "auto", "IP family to use (4, 6, auto)")
+	cmd.Flags().String("log-format", "json", "Log format (json, text)")
+	cmd.Flags().String("otel-endpoint", "", "OpenTelemetry exporter endpoint")
 
 	_ = viper.BindPFlags(cmd.Flags())
 

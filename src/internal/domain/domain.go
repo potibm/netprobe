@@ -3,6 +3,7 @@ package domain
 import (
 	"log/slog"
 	"net/http"
+	"time"
 
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
 )
@@ -17,7 +18,9 @@ type Check interface {
 type CheckResult struct {
 	CheckName    string
 	Success      bool
+	ErrorCode    ErrorCode
 	ErrorMessage string
+	Duration     time.Duration
 }
 
 type Target struct {

@@ -72,3 +72,18 @@ run = """
   : "🐙 Update GitHub Actions"
   npx actions-up
 """
+
+# ==========================================
+# 🐳 INFRASTRUCTURE
+# ==========================================
+
+[tasks."infra:down"]
+description = "Stop infrastructure services"
+run = "docker compose down"
+
+[tasks."infra:restart"]
+description = "Restart infrastructure services"
+run = """
+  mise run infra:down
+  mise run infra:up
+"""
