@@ -16,11 +16,15 @@ import (
 
 func TestNewProbeMetrics(t *testing.T) {
 	reader := sdkmetric.NewManualReader()
+
 	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	defer mp.Shutdown(context.Background())
+	defer func() {
+		_ = mp.Shutdown(context.Background())
+	}()
 
 	// Set the global meter provider so otel.Meter() uses our test provider
 	originalMeterProvider := otel.GetMeterProvider()
+
 	otel.SetMeterProvider(mp)
 	defer otel.SetMeterProvider(originalMeterProvider)
 
@@ -46,6 +50,7 @@ func TestNewProbeMetrics(t *testing.T) {
 
 	// Collect the recorded metrics
 	var rm metricdata.ResourceMetrics
+
 	err := reader.Collect(ctx, &rm)
 	require.NoError(t, err)
 
@@ -60,20 +65,24 @@ func TestNewProbeMetrics(t *testing.T) {
 
 func findScopeMetrics(t *testing.T, rm metricdata.ResourceMetrics, scopeName string) *metricdata.ScopeMetrics {
 	t.Helper()
+
 	for i := range rm.ScopeMetrics {
 		if rm.ScopeMetrics[i].Scope.Name == scopeName {
 			return &rm.ScopeMetrics[i]
 		}
 	}
+
 	return nil
 }
 
 func assertMetricExists(t *testing.T, metrics []metricdata.Metrics, name string) {
 	t.Helper()
+
 	for _, m := range metrics {
 		if m.Name == name {
 			return
 		}
 	}
+
 	t.Errorf("expected metric %s to exist in collected metrics", name)
 }
