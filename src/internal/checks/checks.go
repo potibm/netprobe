@@ -9,6 +9,8 @@ import (
 	"github.com/potibm/netprobe/src/internal/config"
 	"github.com/potibm/netprobe/src/internal/domain"
 	netprobe_net "github.com/potibm/netprobe/src/internal/net"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 type CheckRunner struct {
@@ -17,6 +19,8 @@ type CheckRunner struct {
 	name    string
 	cfg     config.Defaults
 	clients domain.ClientList
+	metrics ProbeMetrics
+	iface   string
 }
 
 func NewCheckRunner(
@@ -24,13 +28,20 @@ func NewCheckRunner(
 	iface string,
 	family netprobe_net.IPFamily,
 	logger *slog.Logger,
-) *CheckRunner {
+) (*CheckRunner, error) {
+	metrics, err := NewProbeMetrics()
+	if err != nil {
+		return nil, err
+	}
+
 	runner := &CheckRunner{
 		targets: cfg.BuildTargets(),
 		clients: make(map[netprobe_net.IPFamily]*http.Client),
 		logger:  logger.With("name", cfg.Name),
 		name:    cfg.Name,
 		cfg:     cfg.Defaults,
+		metrics: metrics,
+		iface:   iface,
 	}
 
 	timeout := time.Duration(cfg.Defaults.TimeoutSeconds) * time.Second
@@ -51,7 +62,7 @@ func NewCheckRunner(
 		}
 	}
 
-	return runner
+	return runner, nil
 }
 
 func (cr *CheckRunner) Run(ctx context.Context) {
@@ -62,7 +73,7 @@ func (cr *CheckRunner) Run(ctx context.Context) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	cr.runOnce()
+	cr.runOnce(ctx)
 
 	for {
 		select {
@@ -72,12 +83,12 @@ func (cr *CheckRunner) Run(ctx context.Context) {
 			return
 
 		case <-ticker.C:
-			cr.runOnce()
+			cr.runOnce(ctx)
 		}
 	}
 }
 
-func (cr *CheckRunner) runOnce() {
+func (cr *CheckRunner) runOnce(ctx context.Context) {
 	for _, target := range cr.targets {
 		log := cr.logger.With("target", target.Hostname)
 
@@ -85,19 +96,45 @@ func (cr *CheckRunner) runOnce() {
 
 		for _, check := range target.Checks {
 			log.Debug("Running check", "check", check.Name())
-			result := check.Execute(cr.clients, log)
 
-			cr.handleResult(target, result, log)
+			start := time.Now()
+			result := check.Execute(cr.clients, log)
+			result.Duration = time.Since(start)
+
+			cr.handleResult(ctx, target, result, log)
 		}
 	}
 }
 
-func (cr *CheckRunner) handleResult(target domain.Target, result domain.CheckResult, log *slog.Logger) {
+func (cr *CheckRunner) handleResult(
+	ctx context.Context,
+	target domain.Target,
+	result domain.CheckResult,
+	log *slog.Logger,
+) {
+	attrs := metric.WithAttributes(
+		attribute.String("target_id", target.ID),
+		attribute.String("hostname", target.Hostname),
+		attribute.String("check_type", result.CheckName),
+		attribute.String("interface", cr.iface),
+	)
+
+	cr.metrics.Duration.Record(ctx, result.Duration.Milliseconds(), attrs)
+
 	if result.Success {
+		cr.metrics.ExecutionTotal.Add(ctx, 1, attrs, metric.WithAttributes(attribute.String("status", "success")))
+		cr.metrics.Status.Record(ctx, 1, attrs)
+
 		log.Debug("✅ Check passed", "check", result.CheckName)
 
 		return
 	}
+
+	cr.metrics.ExecutionTotal.Add(ctx, 1, attrs, metric.WithAttributes(
+		attribute.String("status", "failed"),
+		attribute.String("failure_reason", string(result.ErrorCode)),
+	))
+	cr.metrics.Status.Record(ctx, 0, attrs)
 
 	log.Error("❌ Check failed",
 		"check", result.CheckName,

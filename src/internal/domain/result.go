@@ -64,6 +64,7 @@ func NewCheckResultFailure(checkName string, code ErrorCode, family string, deta
 	return CheckResult{
 		CheckName:    checkName,
 		Success:      false,
+		ErrorCode:    code,
 		ErrorMessage: RenderError(code, family, details...),
 	}
 }

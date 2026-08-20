@@ -33,6 +33,7 @@ func TestNewCheckResultFailure(t *testing.T) {
 	result := NewCheckResultFailure("HTTP", ErrNotAvailable, "")
 	assert.Equal(t, "HTTP", result.CheckName)
 	assert.False(t, result.Success)
+	assert.Equal(t, ErrNotAvailable, result.ErrorCode)
 	assert.NotEmpty(t, result.ErrorMessage)
 }
 
