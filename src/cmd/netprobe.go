@@ -58,7 +58,11 @@ func NewCheckCmd() *cobra.Command {
 
 			logger.Info("⚙️ Loaded config", "name", cfg.Name, "probes", len(cfg.Probes))
 
-			checkRunner := checks.NewCheckRunner(*cfg, iface, ipFamily, logger)
+			checkRunner, err := checks.NewCheckRunner(*cfg, iface, ipFamily, logger)
+			if err != nil {
+				return fmt.Errorf("failed to create check runner: %w", err)
+			}
+
 			checkRunner.Run(ctx)
 
 			return nil

@@ -2,7 +2,6 @@ package checks
 
 import (
 	"context"
-	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,8 +27,8 @@ func TestNewProbeMetrics(t *testing.T) {
 	otel.SetMeterProvider(mp)
 	defer otel.SetMeterProvider(originalMeterProvider)
 
-	logger := slog.New(slog.DiscardHandler)
-	metrics := NewProbeMetrics(logger)
+	metrics, err := NewProbeMetrics()
+	require.NoError(t, err)
 
 	assert.NotNil(t, metrics.ExecutionTotal, "ExecutionTotal should not be nil")
 	assert.NotNil(t, metrics.Duration, "Duration should not be nil")
@@ -51,7 +50,7 @@ func TestNewProbeMetrics(t *testing.T) {
 	// Collect the recorded metrics
 	var rm metricdata.ResourceMetrics
 
-	err := reader.Collect(ctx, &rm)
+	err = reader.Collect(ctx, &rm)
 	require.NoError(t, err)
 
 	// Find our metrics in the collected data

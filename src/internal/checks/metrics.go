@@ -1,8 +1,6 @@
 package checks
 
 import (
-	"log/slog"
-
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -13,7 +11,7 @@ type ProbeMetrics struct {
 	Status         metric.Int64Gauge
 }
 
-func NewProbeMetrics(logger *slog.Logger) ProbeMetrics {
+func NewProbeMetrics() (ProbeMetrics, error) {
 	meter := otel.Meter("github.com/potibm/netprobe/src/internal/checks")
 
 	execTotal, err := meter.Int64Counter(
@@ -21,7 +19,7 @@ func NewProbeMetrics(logger *slog.Logger) ProbeMetrics {
 		metric.WithDescription("Total number of executed checks"),
 	)
 	if err != nil {
-		logger.Error("Failed to create execution_total metric", "error", err)
+		return ProbeMetrics{}, err
 	}
 
 	duration, err := meter.Int64Histogram(
@@ -30,7 +28,7 @@ func NewProbeMetrics(logger *slog.Logger) ProbeMetrics {
 		metric.WithUnit("ms"),
 	)
 	if err != nil {
-		logger.Error("Failed to create duration metric", "error", err)
+		return ProbeMetrics{}, err
 	}
 
 	status, err := meter.Int64Gauge(
@@ -38,12 +36,12 @@ func NewProbeMetrics(logger *slog.Logger) ProbeMetrics {
 		metric.WithDescription("Current status of the target (1=Ok, 0=Error/Alert)"),
 	)
 	if err != nil {
-		logger.Error("Failed to create status metric", "error", err)
+		return ProbeMetrics{}, err
 	}
 
 	return ProbeMetrics{
 		ExecutionTotal: execTotal,
 		Duration:       duration,
 		Status:         status,
-	}
+	}, nil
 }

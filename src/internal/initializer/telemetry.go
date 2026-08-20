@@ -33,6 +33,8 @@ func InitTelemetry(ctx context.Context, endpoint, version string) (func(), error
 		return nil, err
 	}
 
+	var cleanups []func(context.Context) error
+
 	// traces
 	traceExporter, err := otlptracegrpc.New(ctx, otlptracegrpc.WithInsecure(), otlptracegrpc.WithEndpoint(endpoint))
 	if err != nil {
@@ -41,10 +43,13 @@ func InitTelemetry(ctx context.Context, endpoint, version string) (func(), error
 
 	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(traceExporter), sdktrace.WithResource(res))
 	otel.SetTracerProvider(tp)
+	cleanups = append(cleanups, tp.Shutdown)
 
 	// logs
 	logExporter, err := otlploggrpc.New(ctx, otlploggrpc.WithInsecure(), otlploggrpc.WithEndpoint(endpoint))
 	if err != nil {
+		cleanupAll(ctx, cleanups)
+
 		return nil, err
 	}
 
@@ -53,10 +58,13 @@ func InitTelemetry(ctx context.Context, endpoint, version string) (func(), error
 		sdklog.WithResource(res),
 	)
 	global.SetLoggerProvider(lp)
+	cleanups = append(cleanups, lp.Shutdown)
 
 	// metrics
 	metricExporter, err := otlpmetricgrpc.New(ctx, otlpmetricgrpc.WithInsecure(), otlpmetricgrpc.WithEndpoint(endpoint))
 	if err != nil {
+		cleanupAll(ctx, cleanups)
+
 		return nil, err
 	}
 
@@ -65,22 +73,29 @@ func InitTelemetry(ctx context.Context, endpoint, version string) (func(), error
 		sdkmetric.WithResource(res),
 	)
 	otel.SetMeterProvider(mp)
+	cleanups = append(cleanups, mp.Shutdown)
 
 	// add runtime metrics
 	err = runtime.Start(runtime.WithMeterProvider(mp))
 	if err != nil {
+		cleanupAll(ctx, cleanups)
+
 		return nil, err
 	}
 
 	// return cleanup function
 	return func() {
-		const shutdownTimeout = 5 * time.Second
-
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-		defer cancel()
-
-		_ = tp.Shutdown(shutdownCtx)
-		_ = lp.Shutdown(shutdownCtx)
-		_ = mp.Shutdown(shutdownCtx)
+		cleanupAll(ctx, cleanups)
 	}, nil
+}
+
+func cleanupAll(ctx context.Context, cleanups []func(context.Context) error) {
+	const shutdownTimeout = 5 * time.Second
+
+	shutdownCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
+	defer cancel()
+
+	for _, fn := range cleanups {
+		_ = fn(shutdownCtx)
+	}
 }

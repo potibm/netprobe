@@ -14,7 +14,6 @@ services:
     image: otel/opentelemetry-collector-contrib:latest
     volumes:
       - ./infra/otel-config.yaml:/etc/otel/config.yaml
-      - ./backend/logs:/etc/app/logs:ro
     command: ["--config=/etc/otel/config.yaml"]
     ports:
       - "3317:4317" # OTLP gRPC

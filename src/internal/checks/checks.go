@@ -28,14 +28,19 @@ func NewCheckRunner(
 	iface string,
 	family netprobe_net.IPFamily,
 	logger *slog.Logger,
-) *CheckRunner {
+) (*CheckRunner, error) {
+	metrics, err := NewProbeMetrics()
+	if err != nil {
+		return nil, err
+	}
+
 	runner := &CheckRunner{
 		targets: cfg.BuildTargets(),
 		clients: make(map[netprobe_net.IPFamily]*http.Client),
 		logger:  logger.With("name", cfg.Name),
 		name:    cfg.Name,
 		cfg:     cfg.Defaults,
-		metrics: NewProbeMetrics(logger),
+		metrics: metrics,
 		iface:   iface,
 	}
 
@@ -57,7 +62,7 @@ func NewCheckRunner(
 		}
 	}
 
-	return runner
+	return runner, nil
 }
 
 func (cr *CheckRunner) Run(ctx context.Context) {
